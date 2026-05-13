@@ -2,3 +2,4 @@ Temporary references file. Will eventually include this in readme.txt or keep se
 
 https://github.com/UpGado/ascii_racer
 https://zguide.zeromq.org/docs/chapter3/
+https://moodle.cqu.edu.au/ --> moodle lessons and other materials available

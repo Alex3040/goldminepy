@@ -1,70 +1,122 @@
-import os
-import random
-import msvcrt  # Windows keyboard input
+import os, sys, threading, time, msvcrt
 
-GRID_SIZE = 20
+import zmq
 
-player = {"x": 0, "y": 0, "score": 0}
-gold = {"x": random.randint(0, GRID_SIZE - 1), "y": random.randint(0, GRID_SIZE - 1)}
+from game.config import SERVER_IP, MOVE_PORT, STATE_PORT, CLIENT_MOVE_COOLDOWN
 
+last_move_time = 0.12
 
 def clear_screen():
-    os.system("cls")
+    os.system("cls" if os.name == "nt" else "clear")
 
 
-def draw_board():
+def render(state, my_name):
     clear_screen()
 
-    print("Gold Miner - Use W/A/S/D to move, Q to quit")
-    print(f"Score: {player["score"]}")
+    grid_size = state["grid_size"]
+    players = state["players"]
+    gold = state["gold"]
+
+    print("Gold Miner")
+    print("Use W/A/S/D to move. Press Q to quit.")
     print()
 
-    for y in range(GRID_SIZE):
+    for name, player in players.items():
+        label = "YOU" if name == my_name else name
+        print(f"{label}: score={player['score']} position=({player['x']}, {player['y']})")
+
+    print()
+
+    for y in range(grid_size):
         row = ""
-        for x in range(GRID_SIZE):
-            if player["x"] == x and player["y"] == y:
-                row += "P "
-            elif gold["x"] == x and gold["y"] == y:
-                row += "G "
-            else:
-                row += ". "
+
+        for x in range(grid_size):
+            cell = ". "
+
+            if gold["x"] == x and gold["y"] == y:
+                cell = "$ "
+
+            for name, player in players.items():
+                if player["x"] == x and player["y"] == y:
+                    cell = "P " if name == my_name else "B "
+
+            row += cell
+
         print(row)
 
 
-def move_player(direction):
-    if direction == "w" and player["y"] > 0:
-        player["y"] -= 1
-    elif direction == "s" and player["y"] < GRID_SIZE - 1:
-        player["y"] += 1
-    elif direction == "a" and player["x"] > 0:
-        player["x"] -= 1
-    elif direction == "d" and player["x"] < GRID_SIZE - 1:
-        player["x"] += 1
+def receive_states(state_socket, my_name):
+    while True:
+        message = state_socket.recv_json()
 
+        if message["type"] == "join_response" and message["player"] == my_name:
+            if not message["accepted"]:
+                print(f"Join refused: {message['reason']}")
+                os._exit(0)
 
-def check_gold():
-    global gold
-
-    if player["x"] == gold["x"] and player["y"] == gold["y"]:
-        player["score"] += 1
-        gold = {
-            "x": random.randint(0, GRID_SIZE - 1),
-            "y": random.randint(0, GRID_SIZE - 1),
-        }
+        elif message["type"] == "state":
+            render(message, my_name)
 
 
 def main():
-    while True:
-        draw_board()
+    if len(sys.argv) < 2:
+        print("Usage: python player_client.py <player_name>")
+        return
 
+    player_name = sys.argv[1]
+
+    context = zmq.Context()
+
+    move_socket = context.socket(zmq.PUSH)
+    move_socket.connect(f"tcp://{SERVER_IP}:{MOVE_PORT}")
+
+    state_socket = context.socket(zmq.SUB)
+    state_socket.connect(f"tcp://{SERVER_IP}:{STATE_PORT}")
+    state_socket.setsockopt_string(zmq.SUBSCRIBE, "")
+
+    receiver_thread = threading.Thread(
+        target=receive_states,
+        args=(state_socket, player_name),
+        daemon=True,
+    )
+    receiver_thread.start()
+
+    move_socket.send_json({
+        "type": "join",
+        "player": player_name,
+    })
+
+    while True:
         key = msvcrt.getch().decode("utf-8").lower()
 
         if key == "q":
             break
 
-        if key in ["w", "a", "s", "d"]:
-            move_player(key)
-            check_gold()
+        now = time.time()
+
+        last_move_time = 0
+
+        if now - last_move_time < CLIENT_MOVE_COOLDOWN:
+            continue
+
+        direction = None
+
+        if key == "w":
+            direction = "UP"
+        elif key == "s":
+            direction = "DOWN"
+        elif key == "a":
+            direction = "LEFT"
+        elif key == "d":
+            direction = "RIGHT"
+
+        if direction:
+            move_socket.send_json({
+                "type": "move",
+                "player": player_name,
+                "direction": direction,
+            })
+            last_move_time = now
 
 
 if __name__ == "__main__":
