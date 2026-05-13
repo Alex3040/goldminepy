@@ -1,0 +1,4 @@
+Temporary references file. Will eventually include this in readme.txt or keep separate.
+
+https://github.com/UpGado/ascii_racer
+https://zguide.zeromq.org/docs/chapter3/
