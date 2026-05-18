@@ -1,6 +1,6 @@
 import random
 
-
+# Gold spawning and collision logic for the gold mine game. This module handles placing gold on the grid and checking if players have collected it.
 def spawn_gold(grid_size, players=None):
     while True:
         gold = {
@@ -21,7 +21,7 @@ def spawn_gold(grid_size, players=None):
         if not occupied:
             return gold
 
-
+# Check if the player has collided with the gold. If so, increase their score and spawn new gold.
 def check_gold_collision(players, player_name, gold, grid_size):
     player = players[player_name]
 

@@ -116,6 +116,7 @@ def main():
             continue
 
         if direction:
+            time.sleep(2)  # Small delay to add planned delay for testing purposes.
             move_socket.send_json({
                 "type": "move",
                 "player": player_name,

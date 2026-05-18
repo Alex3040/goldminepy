@@ -1,5 +1,5 @@
 
-
+# Movement logic for the gold mine game. This module handles player movement and ensures that players cannot move outside the boundaries of the grid.
 def move_player(players, player_name, direction, grid_size):
     player = players[player_name]
 
